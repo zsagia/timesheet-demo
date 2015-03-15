@@ -243,6 +243,18 @@ var TimesheetDay = A.Component.create({
 });
 
 A.TimesheetDay = TimesheetDay;
+
+var TimesheetDays = A.Base.create(TIMESHEET_DAYS, A.ModelList, [], {
+	NAME: TIMESHEET_DAYS,
+
+	ATTRS: {
+		locale: {
+			value: 'en'
+		}
+	}
+});
+
+A.TimesheetDays = TimesheetDays;
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
