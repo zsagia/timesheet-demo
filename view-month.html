@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
@@ -25,6 +26,45 @@
 
 			<article>
 				<div id="timesheet"></div>
+				<script>
+			    YUI({ filter: 'raw' }).use('timesheet', function(Y) {
+
+					var dataObject = {
+						user: {
+							id: 123456,
+							name: 'Zsolt Szabo'
+						},
+						data: {
+							endDate: '2015 03 31',
+							startDate: '2015 03 01',
+							itmes: [
+								{
+									userId: 123456,
+									endTime: '2015 03 02 18 00',
+									lunchTime: '01 00',
+									startTime: '2015 03 02 08 00'
+								}
+							]
+						}
+					};
+
+					var timesheetViews = [
+						new Y.TimesheetMonthView({
+							headerElements: ['days', 'startTime', 'endTime', 'lunch', 'allTime', 'workTime', 'overTime']
+						})
+			        ];
+
+			        new Y.Timesheet({
+			            boundingBox: '#timesheet',
+			            dataObject: dataObject,
+			            firstDayOfWeek: 1,
+			            locale: "hu",
+			            views: timesheetViews,
+			            activeView: timesheetViews[0]
+			        }).render();
+
+			    });
+			    </script>
 			</article>
 		</div>
 	</body>
