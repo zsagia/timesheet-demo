@@ -346,6 +346,472 @@ A.mix(TimesheetDaySupport.prototype, {
 });
 
 A.TimesheetDaySupport = TimesheetDaySupport;
+
+var TimesheetBase =  A.Component.create({
+	NAME: TIMESHEET_BASE,
+
+	ATTRS: {
+		activeView: {
+              validator: isTimesheetView
+           },
+
+           controlsNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_CONTROLS);
+              }
+           },
+
+           date: {
+              value: new Date(),
+              validator: isDate
+           },
+
+           firstDayOfWeek: {
+              value: 0,
+              validator: isNumber
+           },
+
+           headerNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_HD);
+              }
+           },
+
+           iconNextNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_ICON_NEXT);
+              }
+           },
+
+           iconPrevNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_ICON_PREV);
+              }
+           },
+
+           navigationDateFormatter: {
+              value: function(date) {
+                  var instance = this;
+
+                  return A.DataType.Date.format(
+                    date, {
+                        format: '%B %d, %Y',
+                        locale: instance.get(LOCALE)
+                    }
+                  );
+              },
+              validator: isFunction
+           },
+
+           navNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_NAV);
+              }
+           },
+
+           strings: {
+              value: {
+                  day: 'Day',
+                  month: 'Month',
+                  today: 'Today',
+                  week: 'Week',
+                  year: 'Year'
+              }
+           },
+
+           todayDate: {
+              value: new Date(),
+              validator: isDate
+           },
+
+           todayNode: {
+              valueFn: function() {
+                  return A.Node.create(
+                    this._processTemplate(TPL_TIMESHEET_TODAY)
+                  );
+              }
+           },
+
+           viewsNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_VIEWS);
+              }
+           },
+
+		viewDate: {
+              getter: '_getViewDate',
+              readOnly: true
+           },
+
+           viewDateNode: {
+              valueFn: function() {
+                  return A.Node.create(TPL_TIMESHEET_VIEW_DATE);
+              }
+           },
+
+           views: {
+              setter: '_setViews',
+              value: []
+           }
+
+	},
+
+	HTML_PARSER: {
+           controlsNode: _DOT + CSS_TIMESHEET_CONTROLS,
+           viewDateNode: _DOT + CSS_TIMESHEET_VIEW_DATE,
+           headerNode: _DOT + CSS_TIMESHEET_HD,
+           iconNextNode: _DOT + CSS_TIMESHEET_ICON_NEXT,
+           iconPrevNode: _DOT + CSS_TIMESHEET_ICON_PREV,
+           navNode: _DOT + CSS_TIMESHEET_NAV,
+           todayNode: _DOT + CSS_TIMESHEET_TODAY,
+           viewsNode: _DOT + CSS_TIMESHEET_VIEWS
+    },
+
+    UI_ATTRS: [DATE, ACTIVE_VIEW],
+
+	AUGMENTS: [A.TimesheetDaySupport, A.WidgetStdMod],
+
+	prototype: {
+           /**
+           * TimesheetBase
+           */
+		initializer: function() {
+                  var instance = this;
+
+                  instance[VIEW_STACK] = {};
+
+                  instance[CONTROLS_NODE] = instance.get(CONTROLS_NODE);
+                  instance[VIEW_DATE_NODE] = instance.get(VIEW_DATE_NODE);
+                  instance[HEADER] = instance.get(HEADER_NODE);
+                  instance[ICON_NEXT_NODE] = instance.get(ICON_NEXT_NODE);
+                  instance[ICON_PREV_NODE] = instance.get(ICON_PREV_NODE);
+                  instance[NAV_NODE] = instance.get(NAV_NODE);
+                  instance[TODAY_NODE] = instance.get(TODAY_NODE);
+                  instance[VIEWS_NODE] = instance.get(VIEWS_NODE);
+
+                  instance.after({
+                      activeViewChange: instance._afterActiveViewChange,
+                      render: instance._afterRender
+                  });
+
+                  this.publish({
+                      plotViewTimesheetDays: {
+                        defaultFn: this._defPlotViewTimesheetDaysFn
+                      }
+                  });
+               },
+
+           /**
+           * TimesheetBase
+           */
+           bindUI: function() {
+              var instance = this;
+
+              instance._bindDelegate();
+           },
+
+           /**
+           * TimesheetBase
+           */
+           plotViewTimesheetDays: function(view) {
+              var instance = this;
+
+              view.plotTimesheetDays(
+                  instance.getTimesheetDays()
+              );
+           },
+
+           /**
+           * TimesheetBase
+           */
+           renderButtonGroup: function() {
+              var instance = this;
+
+              instance.buttonGroup = new A.ButtonGroup({
+                  boundingBox: instance[VIEWS_NODE],
+                  on: {
+                    selectionChange: A.bind(instance._onButtonGroupSelectionChange, instance)
+                  }
+              }).render();
+           },
+
+           /**
+           * TimesheetBase
+           */
+           renderView: function(view) {
+              var instance = this;
+
+              if (view) {
+                  view.show();
+
+                  if (!view.get(RENDERED)) {
+                    if (!instance.bodyNode) {
+                        instance.setStdModContent(WidgetStdMod.BODY, _EMPTY_STR);
+                    }
+
+                    view.render(instance.bodyNode);
+                  }
+              }
+           },
+
+           /**
+           * TimesheetBase
+           */
+           syncTimesheetDaysUI: function() {
+              var instance = this,
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              if (activeView) {
+                  this.fire('plotViewTimesheetDays');
+              }
+           },
+
+           /**
+           * TimesheetBase
+           */
+           syncStdContent: function() {
+              var instance = this;
+              var views = instance.get(VIEWS);
+
+              instance[NAV_NODE].append(instance[ICON_PREV_NODE]);
+              instance[NAV_NODE].append(instance[ICON_NEXT_NODE]);
+
+              instance[CONTROLS_NODE].append(instance[TODAY_NODE]);
+              instance[CONTROLS_NODE].append(instance[NAV_NODE]);
+              instance[CONTROLS_NODE].append(instance[VIEW_DATE_NODE]);
+
+              A.Array.each(views, function(view) {
+                  instance[VIEWS_NODE].append(instance._createViewTriggerNode(view));
+              });
+
+              instance[HEADER].append(instance[CONTROLS_NODE]);
+              instance[HEADER].append(instance[VIEWS_NODE]);
+
+              instance.setStdModContent(WidgetStdMod.HEADER, instance[HEADER].getDOM());
+           },
+
+           /**
+           * TimesheetBase
+           */
+           syncUI: function() {
+              var instance = this;
+
+              instance.syncStdContent();
+           },
+
+           /**
+           * TimesheetBase
+           */
+           _afterActiveViewChange: function(event) {
+              var instance = this;
+
+              if (instance.get(RENDERED)) {
+                  var activeView = event.newVal;
+                  var lastActiveView = event.prevVal;
+
+                  if (lastActiveView) {
+                    lastActiveView.hide();
+                  }
+
+                  instance.renderView(activeView);
+
+                  var eventRecorder = instance.get(EVENT_RECORDER);
+
+                  if (eventRecorder) {
+                    eventRecorder.hidePopover();
+                  }
+
+                  instance._uiSetDate(instance.get(DATE));
+              }
+           },
+
+           /**
+           * TimesheetBase
+           */
+           _afterRender: function(event) {
+              var instance = this,
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              instance.renderView(activeView);
+              instance.renderButtonGroup();
+
+              instance._uiSetDate(instance.get(DATE));
+              instance._uiSetActiveView(activeView);
+           },
+
+           /**
+           * TimesheetBase
+           */
+           _bindDelegate: function() {
+              var instance = this;
+
+              instance[CONTROLS_NODE].delegate('click', instance._onClickPrevIcon, _DOT + CSS_TIMESHEET_ICON_PREV,
+                  instance);
+              instance[CONTROLS_NODE].delegate('click', instance._onClickNextIcon, _DOT + CSS_TIMESHEET_ICON_NEXT,
+                  instance);
+              instance[CONTROLS_NODE].delegate('click', instance._onClickToday, _DOT + CSS_TIMESHEET_TODAY, instance);
+           },
+
+           /**
+           * TimesheetBase
+           */
+           _createViewTriggerNode: function(view) {
+              var instance = this;
+
+              if (!view.get(TRIGGER_NODE)) {
+                  var name = view.get(NAME);
+
+                  view.set(
+                    TRIGGER_NODE,
+                    A.Node.create(
+                        Lang.sub(TPL_TIMESHEET_VIEW, {
+                             name: name,
+                             label: (instance.getString(name) || name)
+                        })
+                    )
+                  );
+              }
+
+              return view.get(TRIGGER_NODE);
+           },
+
+           // TimesheetBase
+           _defPlotViewTimesheetDaysFn: function() {
+              this.plotViewTimesheetDays(this.get('activeView'));
+           },
+
+           // TimesheetBase
+		_getViewDate: function() {
+              var instance = this,
+                  date = instance.get(DATE),
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              if (activeView) {
+                  date = activeView.getAdjustedViewDate(date);
+              }
+
+              return date;
+           },
+
+           // TimesheetBase
+           _onButtonGroupSelectionChange: function(event) {
+              var instance = this,
+                  viewName = event.originEvent.target.attr(DATA_VIEW_NAME);
+
+              //instance.set(ACTIVE_VIEW, instance.getViewByName(viewName));
+
+              event.preventDefault();
+           },
+
+           // TimesheetBase
+           _onClickToday: function(event) {
+              var instance = this,
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              if (activeView) {
+                  instance.set(DATE, instance.get(TODAY_DATE));
+              }
+
+              event.preventDefault();
+           },
+
+           // TimesheetBase
+           _onClickNextIcon: function(event) {
+              var instance = this,
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              if (activeView) {
+                  instance.set(DATE, activeView.get(NEXT_DATE));
+              }
+
+              event.preventDefault();
+           },
+
+           // TimesheetBase
+           _onClickPrevIcon: function(event) {
+              var instance = this,
+                  activeView = instance.get(ACTIVE_VIEW);
+
+              if (activeView) {
+                  instance.set(DATE, activeView.get(PREV_DATE));
+              }
+
+              event.preventDefault();
+           },
+
+           // TimesheetBase
+           _processTemplate: function(tpl) {
+              var instance = this;
+
+              return Lang.sub(tpl, instance.getStrings());
+           },
+
+           // TimesheetBase
+           _setViews: function(val) {
+              var instance = this;
+              var views = [];
+
+              A.Array.each(val, function(view) {
+                  if (isTimesheetView(view) && !view.get(RENDERED)) {
+                    view.setAttrs({
+                        timesheet: instance
+                    });
+
+                    views.push(view);
+
+                    instance[VIEW_STACK][view.get(NAME)] = view;
+                  }
+              });
+
+              if (!instance.get(ACTIVE_VIEW)) {
+                  instance.set(ACTIVE_VIEW, val[0]);
+              }
+
+              return views;
+           },
+
+           // TimesheetBase
+           _uiSetActiveView: function(val) {
+              var instance = this;
+
+              if (val) {
+                  var activeView = val.get(NAME),
+                    activeNav = instance[VIEWS_NODE].one(_DOT + CSS_TIMESHEET_VIEW_ + activeView);
+
+                  if (activeNav) {
+                    instance[VIEWS_NODE].all(BUTTON).removeClass(CSS_TIMESHEET_VIEW_SELECTED);
+                    activeNav.addClass(CSS_TIMESHEET_VIEW_SELECTED);
+                  }
+              }
+           },
+
+           // TimesheetBase
+           _uiSetDate: function(val) {
+              var instance = this;
+
+              var formatter = instance.get(NAVIGATION_DATE_FORMATTER);
+              var navigationTitle = formatter.call(instance, val);
+
+              if (instance.get(RENDERED)) {
+                  var activeView = instance.get(ACTIVE_VIEW);
+
+                  if (activeView) {
+                    activeView._uiSetDate(val);
+
+                    formatter = activeView.get(NAVIGATION_DATE_FORMATTER);
+                    navigationTitle = formatter.call(activeView, val);
+                  }
+
+                  instance[VIEW_DATE_NODE].html(navigationTitle);
+
+                  instance.syncTimesheetDaysUI();
+              }
+           }
+	}
+
+});
+
+A.Timesheet = TimesheetBase;
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
