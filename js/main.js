@@ -206,6 +206,43 @@ var Lang = A.Lang,
            '{name}" data-view-name="{name}">{label}</button>',
     TPL_TIMESHEET_VIEW_DATE = '<span class="' + CSS_TIMESHEET_VIEW_DATE + '"></span>',
     TPL_TIMESHEET_VIEWS = '<div class="span5 ' + CSS_TIMESHEET_VIEWS + '"></div>';
+var TimesheetDay = A.Component.create({
+	NAME: TIMESHEET_DAY,
+
+	ATTRS: {
+           endDate: {
+              validator: isDate
+           },
+
+		endTime: {
+			validator: isNumber
+		},
+
+		lunchTime: {
+			validator: isNumber
+		},
+
+           startDate: {
+              validator: isDate
+           },
+
+		startTime: {
+			validator: isNumber
+		},
+
+		userId: {
+              validator: isString
+		},
+
+           userName: {
+              validator: isString
+           }
+	},
+
+	EXTENDS: A.Model
+});
+
+A.TimesheetDay = TimesheetDay;
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
