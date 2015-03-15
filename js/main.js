@@ -947,6 +947,440 @@ var TimesheetView = A.Component.create({
 });
 
 A.TimesheetView = TimesheetView;
+
+var TimesheetMonthView = A.Component.create({
+
+    NAME: TIMESHEET_VIEW_MONTH,
+
+    ATTRS: {
+    	bodyContent: {
+            value: _EMPTY_STR
+        },
+
+        name: {
+            value: MONTH
+        },
+
+        columnHeaderNode: {
+            valueFn: '_valueColumnHeaderNode'
+        },
+
+        headerElements: {
+       	    value: [],
+		  validator: isArray
+        },
+
+        headerDateFormatter: {
+         	value: function(date) {
+                var instance = this;
+                var timesheet = instance.get(TIMESHEET);
+
+                return A.DataType.Date.format(
+                    date, {
+                        format: '%d. %A',
+                        locale: timesheet.get(LOCALE)
+                    }
+                );
+            },
+            validator: isString
+        },
+
+        headerTableNode: {
+            valueFn: function() {
+                return A.Node.create(TPL_TVT_HEADER_TABLE);
+            }
+        },
+
+        navigationDateFormatter: {
+            value: function(date) {
+                var instance = this;
+                var timesheet = instance.get(TIMESHEET);
+
+                return DataTypeDate.format(
+                    date, {
+                        format: '%B %Y',
+                        locale: timesheet.get(LOCALE)
+                    }
+                );
+            },
+            validator: isFunction
+        },
+
+       rowsContainerNode: {
+          valueFn: function() {
+              return A.Node.create(TPL_TVT_CONTAINER);
+          }
+       },
+
+       scrollable: {
+          value: false
+       },
+
+       strings: {
+          value: {
+              close: 'Close',
+              show: 'Show',
+              more: 'more'
+          }
+       },
+
+       today: {
+          value: new Date()
+       }
+    },
+
+    HTML_PARSER: {
+           headerElements: getNodeListHTMLParser(_DOT + CSS_TVT_HEADER_COLUMN, 7),
+           headerTableNode: _DOT + CSS_TVT_HEADER_TABLE,
+           rowsContainerNode: _DOT + CSS_TVT_CONTAINER
+    },
+
+    EXTENDS: A.TimesheetView,
+
+    prototype: {
+    	timesheetDayDateStack: null,
+        timesheetDayRenderedStack: null,
+        rowDataTableStack: null,
+
+        // TimesheetMonthView
+        initializer: function() {
+            var instance = this;
+
+            instance.timesheetDayDateStack = {};
+            instance.timesheetDayRenderedStack = {};
+            instance.rowDataTableStack = {};
+
+    		instance[COLUMN_HEADER_NODE] = instance.get(COLUMN_HEADER_NODE);
+    		instance[HEADER_TABLE_NODE] = instance.get(HEADER_TABLE_NODE);
+    		instance[ROWS_CONTAINER_NODE] = instance.get(ROWS_CONTAINER_NODE);
+    		instance[COLUMN_ELEMENT_HEADER] = instance.headerTableNode.one(_DOT + CSS_TVT_HEADER_COLUMN);
+    		instance[COLUMN_TABLE_GRID] = A.NodeList.create();
+    		instance[TABLE_ROW_CONTAINER] = instance[ROWS_CONTAINER_NODE].one(_DOT + CSS_TVT_ROW_CONTAINER);
+        },
+
+        // TimesheetMonthView
+        renderUI: function() {
+            var instance = this;
+
+            instance[COLUMN_HEADER_NODE].appendTo(instance[COLUMN_ELEMENT_HEADER]);
+       },
+
+       // This is not necesseraly
+       // TimesheetMonthView
+       buildEventsRow: function(rowStartDate, rowEndDate) {
+        var instance = this;
+            var displayRows = instance.get(DISPLAY_ROWS);
+
+              var rowRenderedColumns = 0;
+              //var rowNode = A.Node.create(TPL_TVT_TABLE_DATA_ROW);
+
+              var timesheet = instance.get('timesheet');
+
+              var timesheetDaysAsObject = timesheet._timesheetDaysAsObject;
+
+              instance.loopDates(rowStartDate, rowEndDate, function(celDate, index) {
+              var timesheetDay = timesheetDaysAsObject[rowStartDate.getDate()];
+
+              //instance._syncTimesheetDayNodeUI(timesheetDay, timesheetDayColNode, celDate);
+
+              rowRenderedColumns++;
+          });
+
+          return rowNode;
+       },
+
+       // This is not necesseraly
+       // TimesheetMonthView
+       buildEventsTable: function(rowStartDate, rowEndDate) {
+          var instance = this,
+              intervalStartDate = DateMath.clearTime(instance._findCurrentIntervalStart()),
+              cacheKey = String(intervalStartDate.getTime()).concat(rowStartDate.getTime()).concat(rowEndDate.getTime()),
+              rowDataTableNode = instance.rowDataTableStack[cacheKey];
+
+          if (!rowDataTableNode) {
+              rowDataTableNode = A.Node.create(TPL_TVT_TABLE_DATA);
+
+              var tableBody = rowDataTableNode.one(TBODY);
+
+              instance.rowDataTableStack[cacheKey] = rowDataTableNode;
+          }
+
+          return rowDataTableNode;
+       },
+
+       // TimesheetMonthView
+       buildGridRowNode: function(celDate, index) {
+            var instance = this;
+
+            var tableGridNode = instance._getTableGridNode(celDate, index);
+
+            var rowNode = A.Node.create(TPL_TVT_ROW);
+
+            rowNode.append(tableGridNode);
+
+            return rowNode;
+       },
+
+       // TimesheetMonthView
+        getAdjustedViewDate: function(val) {
+            var instance = this;
+
+          return DateMath.toMidnight(DateMath.findMonthStart(val));
+        },
+
+        // TimesheetMonthView
+        getNextDate: function() {
+            var instance = this;
+
+            var timesheet = instance.get(TIMESHEET);
+            var viewDate = timesheet.get(VIEW_DATE);
+
+            return DateMath.toLastHour(DateMath.add(viewDate, DateMath.MONTH, 1));
+        },
+
+        // TimesheetMonthView
+        getPrevDate: function() {
+            var instance = this;
+
+            var timesheet = instance.get(TIMESHEET);
+            var viewDate = timesheet.get(VIEW_DATE);
+
+            return DateMath.toMidnight(DateMath.subtract(viewDate, DateMath.MONTH, 1));
+        },
+
+        // TimesheetMonthView
+        plotTimesheetDays: function() {
+          var instance = this;
+
+          A.TimesheetMonthView.superclass.plotTimesheetDays.apply(instance, arguments);
+
+          var timesheet = instance.get(TIMESHEET);
+          var viewDate = timesheet.get(VIEW_DATE);
+
+          var monthEnd = DateMath.findMonthEnd(viewDate);
+          var monthStart = DateMath.findMonthStart(viewDate);
+
+          var currentIntervalStart = instance._findCurrentIntervalStart();
+        },
+
+        // TimesheetMonthView
+        getRowsNumber: function() {
+          var instance = this,
+              intervalStartDate = instance._findCurrentIntervalStart(),
+              startDateRef = DateMath.safeClearTime(intervalStartDate),
+              rowEndDate = DateMath.safeClearTime(DateMath.findMonthEnd(startDateRef));
+
+          return rowEndDate.getDate();
+        },
+
+        // TimesheetMonthView
+        loopDates: function(startDate, endDate, fn) {
+          var instance = this;
+          var curDate = DateMath.clone(startDate);
+          var endDateMs = endDate.getTime();
+          var index;
+
+          for (index = 0; curDate.getTime() <= endDateMs; index++) {
+              fn.apply(instance, [curDate, index]);
+
+              curDate = DateMath.add(curDate, DateMath.DAY, 1);
+          }
+        },
+
+        // TimesheetMonthView
+        plotTimesheetDays: function() {
+            var instance = this;
+            var intervalStartDate = instance._findCurrentIntervalStart();
+            var startDateRef = DateMath.safeClearTime(intervalStartDate);
+
+            instance.flushViewCache();
+
+            instance.bodyNode.all(_DOT + CSS_TVT_TABLE_DATA).remove();
+
+            var weekDayIndex = 2;
+
+            instance[TABLE_ROWS].each(function(rowNode, index) {
+                var rowStartDate = DateMath.add(startDateRef, DateMath.DAY, weekDayIndex * index);
+                var rowEndDate = DateMath.add(rowStartDate, DateMath.DAY, weekDayIndex - 1);
+            });
+        },
+
+        // TimesheetMonthView
+        syncElementsHeaderUI: function() {
+          var instance = this;
+          var timesheet = instance.get(TIMESHEET);
+          var headerElements = instance.get('headerElements');
+
+          instance.columnHeaderNode.all(DIV).each(
+              function(columnNode, i) {
+                columnNode.html(headerElements[i]);
+              }
+          );
+        },
+
+        // TimesheetMonthView
+        syncGridUI: function() {
+            var instance = this,
+                intervalStartDate = instance._findCurrentIntervalStart(),
+                startDateRef = DateMath.safeClearTime(intervalStartDate),
+                rowStartDate = DateMath.safeClearTime(DateMath.findMonthStart(startDateRef)),
+                rowEndDate = DateMath.safeClearTime(DateMath.findMonthEnd(startDateRef)),
+                cacheKey = String(intervalStartDate.getTime()).concat(rowStartDate.getTime()).concat(rowEndDate.getTime()),
+                rowDataTableNode = instance.rowDataTableStack[cacheKey];
+
+            instance[COLUMN_TABLE_GRID].removeClass(CSS_TVT_COLGRID_TODAY);
+
+            if (!rowDataTableNode) {
+                instance[TABLE_ROWS] = A.NodeList.create();
+                instance[TABLE_GRID_NODE] = instance._valueTableGridNode();
+
+                instance.loopDates(rowStartDate, rowEndDate, function(celDate, index) {
+                    instance[TABLE_ROWS].push(
+                        instance.buildGridRowNode(celDate, index));
+                });
+
+                instance.rowDataTableStack[cacheKey] = instance[TABLE_ROWS];
+            }
+            else {
+                instance[TABLE_ROWS] = rowDataTableNode;
+            }
+
+            instance[TABLE_ROW_CONTAINER].setHTML(instance[TABLE_ROWS]);
+        },
+
+        // TimesheetMonthView
+        syncStdContent: function() {
+          var instance = this;
+
+          instance.setStdModContent(
+              WidgetStdMod.BODY, instance[ROWS_CONTAINER_NODE].getDOM());
+
+          instance.setStdModContent(
+              WidgetStdMod.HEADER, instance[HEADER_TABLE_NODE].getDOM());
+        },
+
+        // TimesheetMonthView
+        _findCurrentIntervalEnd: function() {
+            var instance = this,
+                timesheet = instance.get(TIMESHEET),
+                viewDate = timesheet.get(VIEW_DATE),
+                displayDaysInterval = instance.get(DISPLAY_DAYS_INTERVAL);
+
+            return DateMath.add(viewDate, DateMath.DAY, displayDaysInterval);
+        },
+
+        // TimesheetMonthView
+        _findCurrentIntervalStart: function() {
+          var instance = this,
+              timesheet = instance.get(TIMESHEET),
+              startDate = instance.get('today');
+
+          if (timesheet) {
+              startDate = timesheet.get(VIEW_DATE);
+          }
+
+          return startDate;
+        },
+
+        // TimesheetMonthView
+     	_getTableGridNode: function(celDate, index) {
+            var instance = this,
+                headerElements = instance.get('headerElements'),
+                headerElementsCount = headerElements.length,
+                tableGridNode = instance[TABLE_GRID_NODE].item(index),
+                firstRowNode = tableGridNode.one(TR),
+                i;
+
+            var formatter = instance.get(HEADER_DATE_FORMATTER);
+
+            for (i = 0; i < headerElementsCount; i++) {
+                var columnNode = A.Node.create(TPL_TVT_GRID_COLUMN);
+             
+                firstRowNode.append(columnNode);
+
+                if (i === 0) {
+                    columnNode.addClass(CSS_TVT_COLGRID_FIRST);
+
+                    columnNode.append(formatter.call(instance, celDate));
+                }
+
+                if (DateMath.isToday(celDate)) {
+                    columnNode.addClass(CSS_TVT_ROW_TODAY);
+                }
+
+                if (!DateMath.isWeekDay(celDate)) {
+                    columnNode.addClass(CSS_TVT_ROW_WEEKEND);
+                }
+
+               
+                instance[COLUMN_TABLE_GRID].push(columnNode);
+            }
+
+            return tableGridNode;
+        },
+
+        // TimesheetMonthView
+        _syncTimesheetDayNodeUI: function(timesheetDay, container, celDate) {
+          var instance = this;
+          var timesheet = instance.get(TIMESHEET);
+
+          if (timesheetDay) {
+              var timesheetDayNodeList = timesheetDay.get(NODE);
+              var startDate = timesheetDay.get(START_DATE);
+
+              var intervalStartDate = DateMath.clearTime(instance._findCurrentIntervalStart());
+             
+              var timesheetDayNode = timesheetDayNodeList.item();
+
+              timesheetDayNode.appendTo(container);
+
+              timesheetDay.syncUI();
+          }
+        },
+
+        // TimesheetMonthView
+        _uiSetDate: function(val) {
+            var instance = this;
+
+            instance.syncElementsHeaderUI();
+            instance.syncGridUI();
+        },
+
+           // TimesheetMonthView
+    	_valueColumnHeaderNode: function() {
+              var instance = this;
+
+              var headerElements = instance.get('headerElements');
+            	var headerElementsCount = headerElements.length;
+
+              return instance._valueNodeList(headerElementsCount, TPL_TVT_HEADER_ELEMENT);
+           },
+
+        // TimesheetMonthView
+        _valueNodeList: function(size, tpl) {
+          var instance = this;
+          var buffer = [];
+
+          while (size--) {
+              buffer.push(tpl);
+          }
+
+          return A.NodeList.create(buffer.join(_EMPTY_STR));
+        },
+
+        // TimesheetMonthView
+        _valueTableGridNode: function() {
+          var instance = this;
+
+         	var rowNumber = instance.getRowsNumber()
+
+          return instance._valueNodeList(rowNumber, TPL_TVT_TABLE_GRID);
+        }
+    }
+});
+
+A.TimesheetMonthView = TimesheetMonthView;
+
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
