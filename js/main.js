@@ -255,6 +255,97 @@ var TimesheetDays = A.Base.create(TIMESHEET_DAYS, A.ModelList, [], {
 });
 
 A.TimesheetDays = TimesheetDays;
+
+var TimesheetDaySupport = function() {};
+
+TimesheetDaySupport.ATTRS = {};
+
+A.mix(TimesheetDaySupport.prototype, {
+    dayModel: A.TimesheetDay,
+
+    daysModel: A.TimesheetDays,
+
+    initializer: function(config) {
+           var instance = this,
+              timesheetDays = instance._toTimesheetDays(config.items || config.timesheetDays);
+
+           instance._timesheetDays = new instance.daysModel({
+              after: {
+                  add: A.bind(instance._afterAddTimesheetDay, instance)
+              },
+              bubbleTargets: instance,
+              originalItems: [],
+              TIMESHEET: instance
+           });
+
+           instance._timesheetDaysAsObject = {};
+    },
+
+    getTimesheetDays: function(filterFn, skipSort) {
+           var instance = this,
+              timesheetDays = instance._timesheetDays;
+
+           if (!skipSort) {
+              timesheetDays.sort({
+                  silent: true
+              });
+           }
+
+           if (filterFn) {
+              timesheetDays = timesheetDays.filter(filterFn);
+           }
+           else {
+              timesheetDays = timesheetDays.toArray();
+           }
+
+           return timesheetDays;
+    },
+
+    _afterAddTimesheetDay: function(timesheetDay) {
+           var instance = this,
+              timesheetDaysAsObject = instance._timesheetDaysAsObject,
+              startDate, endDate;
+
+           endDate = new Date(timesheetDay.get('endTime'));
+           timesheetDay.set('endDate', endDate);
+
+           startDate = new Date(timesheetDay.get('startTime'));
+           timesheetDay.set('startDate', startDate);
+
+           timesheetDay.model.set(TIMESHEET, instance);
+
+
+           timesheetDaysAsObject[startDate.getDate(), startDate];
+    },
+
+    _toTimesheetDays: function(values) {
+           var instance = this,
+              timesheetDays = [];
+
+           if (isModelList(values)) {
+              timesheetDays = values.toArray();
+              values.set(TIMESHEET, instance);
+           }
+           else if (isArray(values)) {
+              A.Array.each(values, function(value) {
+                  if (isModelList(value)) {
+                    timesheetDays = timesheetDays.concat(value.toArray());
+                    value.set(TIMESHEET, instance);
+                  }
+                  else {
+                    timesheetDays.push(value);
+                  }
+              });
+           }
+           else {
+              timesheetDays = values;
+           }
+
+           return timesheetDays;
+    } 
+});
+
+A.TimesheetDaySupport = TimesheetDaySupport;
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
