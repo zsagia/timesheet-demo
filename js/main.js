@@ -812,6 +812,141 @@ var TimesheetBase =  A.Component.create({
 });
 
 A.Timesheet = TimesheetBase;
+
+var TimesheetView = A.Component.create({
+	NAME: TIMESHEET_VIEW,
+
+	ATTRS: {
+		bodyContent: {
+              value: _EMPTY_STR
+           },
+
+           height: {
+            	value: 1000
+    	},
+
+    	name: {
+    		value: _EMPTY_STR,
+    		validator: isString
+    	},
+
+    	navigationDateFormatter: {
+              value: function(date) {
+                  var instance = this;
+                  var timesheet = instance.get(TIMESHEET);
+
+                  return A.DataType.Date.format(date, {
+                    format: '%A, %d %B, %Y',
+                    locale: timesheet.get(LOCALE)
+                  });
+              },
+              validator: isFunction
+           },
+
+           nextDate: {
+              getter: 'getNextDate',
+              readOnly: true
+           },
+
+		prevDate: {
+			getter: 'getPrevDate',
+           	readOnly: true
+           },
+
+           scrollable: {
+              value: true,
+              validator: isBoolean
+           },
+
+           timesheet: {
+           	lazyAdd: false,
+           	setter: '_setTimesheet'
+    	},
+	},
+
+    AUGMENTS: [A.WidgetStdMod],
+
+	BIND_UI_ATTRS: [SCROLLABLE],
+
+	prototype: {
+           // TimesheetView
+		initializer: function() {
+              var instance = this;
+
+              instance.after('render', instance._afterRender);
+           },
+
+           // TimesheetView
+           syncUI: function() {
+              var instance = this;
+
+              instance.syncStdContent();
+           },
+
+           // TimesheetView
+           flushViewCache: function() {},
+
+           // TimesheetView
+		getNextDate: function() {},
+
+           // TimesheetView
+		getPrevDate: function() {},
+
+           // TimesheetView
+		getToday: function() {
+             	return DateMath.clearTime(new Date());
+           },
+
+           // TimesheetView
+           syncStdContent: function() {},
+
+           // TimesheetView
+           syncEventUI: function(timesheetDay) {},
+
+           // TimesheetView
+           _afterRender: function(event) {
+              var instance = this;
+
+              instance._uiSetScrollable(
+                  instance.get(SCROLLABLE)
+              );
+           },
+
+           // TimesheetView
+           _uiSetDate: function(val) {},
+
+           // TimesheetView
+           _uiSetScrollable: function(val) {
+              var instance = this;
+              var bodyNode = instance.bodyNode;
+
+              if (bodyNode) {
+                  bodyNode.toggleClass(CSS_TIMESHEET_VIEW_SCROLLABLE, val);
+                  bodyNode.toggleClass(CSS_TIMESHEET_VIEW_NOSCROLL, !val);
+              }
+           },
+
+           // TimesheetView
+           _setTimesheet: function(timesheet) {
+              var instance = this;
+              var oldTimesheet = instance.get(TIMESHEET);
+
+              if (oldTimesheet) {
+                  instance.removeTarget(oldTimesheet);
+              }
+
+              if (timesheet) {
+                  instance.addTarget(timesheet);
+
+                  timesheet.after(['*:add', '*:remove', '*:reset'], A.bind(instance.flushViewCache, instance));
+              }
+
+              return timesheet;
+           }
+	}
+});
+
+A.TimesheetView = TimesheetView;
 }, '0.0.1', {
 	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
