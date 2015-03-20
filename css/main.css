@@ -265,9 +265,8 @@
     table-layout: fixed;
     width: 100%;
 }
-.timesheet-view-table-data-col {
-    border-left: 0 none;
-    padding: 1px 2px 0;
+.yui3-timesheet-view-table-data-column {
+    text-align: center;
 }
 .timesheet-view-table-data-col .timesheet-event-content {
     display: inline;
