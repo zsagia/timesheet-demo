@@ -37,12 +37,48 @@
 						data: {
 							endDate: '2015 03 31',
 							startDate: '2015 03 01',
-							itmes: [
+							items: [
 								{
 									userId: 123456,
-									endTime: '2015 03 02 18 00',
-									lunchTime: '01 00',
-									startTime: '2015 03 02 08 00'
+									endTime: 1425315600000,
+									lunchTime: 3000000,
+									startTime: 1425279600000
+								},
+								{
+									userId: 123456,
+									endTime: 1425403800000,
+									lunchTime: 2700000,
+									startTime: 1425367800000
+								},
+								{
+									userId: 123456,
+									endTime: 1425486600000,
+									lunchTime: 3000000,
+									startTime: 1425456000000
+								},
+								{
+									userId: 123456,
+									endTime: 1425576600000,
+									lunchTime: 3000000,
+									startTime: 1425540600000
+								},
+								{
+									userId: 123456,
+									endTime: 1425661800000,
+									lunchTime: 3000000,
+									startTime: 1425632400000
+								},
+								{
+									userId: 123456,
+									endTime:1425918600000,
+									lunchTime: 2400000,
+									startTime: 1425888000000
+								},
+								{
+									userId: 123456,
+									endTime:1426609800000,
+									lunchTime: 3000000,
+									startTime: 1426577400000
 								}
 							]
 						}
@@ -57,6 +93,7 @@
 			        new Y.Timesheet({
 			            boundingBox: '#timesheet',
 			            dataObject: dataObject,
+			            items: dataObject.data.items,
 			            firstDayOfWeek: 1,
 			            locale: "hu",
 			            views: timesheetViews,
