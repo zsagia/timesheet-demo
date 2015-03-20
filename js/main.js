@@ -12,6 +12,8 @@ var Lang = A.Lang,
 	DateMath = A.DataType.DateMath,
 	WidgetStdMod = A.WidgetStdMod,
 
+	BASE_WORK_TIME_VALUE = 28800000,
+
 	_DOT = '.',
 	_EMPTY_STR = '',
 	_SPACE = ' ',
@@ -26,6 +28,7 @@ var Lang = A.Lang,
 	ACTIVE = 'active',
 	ACTIVE_VIEW = 'activeView',
 	ALL = 'all',
+	BASE_WORK_TIME = 'baseWorkTime',
 	BTN = 'btn',
 	BUTTON = 'button',
 	CHEVRON = 'chevron',
@@ -244,17 +247,13 @@ var TimesheetDay = A.Component.create({
 
 A.TimesheetDay = TimesheetDay;
 
-var TimesheetDays = A.Base.create(TIMESHEET_DAYS, A.ModelList, [], {
-	NAME: TIMESHEET_DAYS,
-
-	ATTRS: {
-		locale: {
-			value: 'en'
-		}
-	}
+A.TimesheetDays = A.Base.create(TIMESHEET_DAYS, A.ModelList, [], {
+	model: A.TimesheetDay
+}, {
+    ATTRS: {
+        timesheet: {}
+    }
 });
-
-A.TimesheetDays = TimesheetDays;
 
 var TimesheetDaySupport = function() {};
 
@@ -686,9 +685,6 @@ var TimesheetBase =  A.Component.create({
                   date = instance.get(DATE),
                   activeView = instance.get(ACTIVE_VIEW);
 
-              if (activeView) {
-                  date = activeView.getAdjustedViewDate(date);
-              }
 
               return date;
            },
@@ -708,9 +704,6 @@ var TimesheetBase =  A.Component.create({
               var instance = this,
                   activeView = instance.get(ACTIVE_VIEW);
 
-              if (activeView) {
-                  instance.set(DATE, instance.get(TODAY_DATE));
-              }
 
               event.preventDefault();
            },
@@ -945,12 +938,37 @@ var TimesheetView = A.Component.create({
            }
 	}
 });
+		rowDateFormatter: {
+			value: function(date) {
+				var instance = this;
+				var timesheet = instance.get(TIMESHEET);
+
+				return A.DataType.Date.format(
+					date, {
+						format: '%X',
+						locale: timesheet.get(LOCALE)
+					}
+				);
+			},
+			validator: isString
+		},
 
 A.TimesheetView = TimesheetView;
 
-var TimesheetMonthView = A.Component.create({
+		hourMinutesFormatter: {
+			value: function(date) {
+				var instance = this;
+				var timesheet = instance.get(TIMESHEET);
 
-    NAME: TIMESHEET_VIEW_MONTH,
+				return A.DataType.Date.format(
+					date, {
+						format: '%Ih:%Mm',
+						locale: timesheet.get(LOCALE)
+					}
+				);
+			},
+			validator: isString
+		},
 
     ATTRS: {
     	bodyContent: {
