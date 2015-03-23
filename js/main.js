@@ -132,6 +132,7 @@ var Lang = A.Lang,
 	CSS_TIMESHEET_TODAY = getCN(TIMESHEET_BASE, TODAY),
 	CSS_TIMESHEET_VIEW = getCN(TIMESHEET_BASE, VIEW),
 	CSS_TIMESHEET_VIEW_ = getCN(TIMESHEET_BASE, VIEW, _EMPTY_STR),
+	CSS_TIMESHEET_VIEW_COLUMN_DATA = getCN(TIMESHEET_BASE, VIEW, COLUMN, DATA),
 	CSS_TIMESHEET_VIEW_DATE = getCN(TIMESHEET_BASE, VIEW, DATE),
 	CSS_TIMESHEET_VIEW_NOSCROLL = getCN(TIMESHEET_VIEW, NOSCROLL),
 	CSS_TIMESHEET_VIEW_SCROLLABLE = getCN(TIMESHEET_VIEW, SCROLLABLE),
@@ -175,6 +176,8 @@ var Lang = A.Lang,
 	CSS_TVT_TABLE_GRID_CONTAINER = getCN(TIMESHEET_VIEW, TABLE, GRID, CONTAINER),
 	CSS_TVT_TABLE_GRID_FIRST = getCN(TIMESHEET_VIEW, TABLE, GRID, FIRST),
 
+	TPL_BODY_CONTENT = '<input type="hidden" name="startDate" value="{startDate}" />' +
+		'<input type="hidden" name="endDate" value="{endDate}" />'
 	TPL_TVT_CONTAINER = '<div class="' + CSS_TVT_CONTAINER + '">' +
 					 '<div class="' + CSS_TVT_ROW_CONTAINER + '"></div>' +
 					 '</div>',
@@ -189,7 +192,6 @@ var Lang = A.Lang,
 	TPL_TVT_TABLE_DATA = '<table cellspacing="0" cellpadding="0" class="' + CSS_TVT_TABLE_DATA + '">' +
 				 '<tbody></tbody>' +
 				 '</table>',
-	TPL_TVT_TABLE_DATA_COLUMN = '<td class="' + CSS_TVT_TABLE_DATA_COLUMN + '"><div></div></td>',
 	TPL_TVT_TABLE_DATA_ROW = '<tr></tr>',
 	TPL_TVT_TABLE_GRID = '<div class="' + CSS_TVT_TABLE_GRID_CONTAINER + '">' +
 				 '<table cellspacing="0" cellpadding="0" class="' + CSS_TVT_TABLE_GRID + '">' +
@@ -208,6 +210,8 @@ var Lang = A.Lang,
 				 '">{today}</button>',
 	TPL_TIMESHEET_VIEW = '<button type="button" class="' + [CSS_TIMESHEET_VIEW, CSS_TIMESHEET_VIEW_, "btn"].join(_SPACE) +
 				 '{name}" data-view-name="{name}">{label}</button>',
+	TPL_TIMESHEET_VIEW_COLUMN_DATA = '<span class="' + CSS_TIMESHEET_VIEW_COLUMN_DATA + '"></span>',
+	TPL_TIMESHEET_VIEW_COLUMN_DATA_EDITOR = '<input placeholder="hh:mm" />',
 	TPL_TIMESHEET_VIEW_DATE = '<span class="' + CSS_TIMESHEET_VIEW_DATE + '"></span>',
 	TPL_TIMESHEET_VIEWS = '<div class="span5 ' + CSS_TIMESHEET_VIEWS + '"></div>';
 
@@ -1301,6 +1305,13 @@ var TimesheetMonthView = A.Component.create({
 				var timesheetDay = timesheet._timesheetDaysAsObject[String(rowStartDate.getTime())];
 
 				instance._buildTimesheetDay(timesheetDay, index);
+
+				rowNode.delegate('click', function(event) {
+					var columnNode = event.currentTarget,
+						node = A.Node.create(TPL_TIMESHEET_VIEW_COLUMN_DATA_EDITOR);
+
+					
+				}, _DOT + CSS_TVT_COLGRID);
 			});
 		},
 
@@ -1382,28 +1393,32 @@ var TimesheetMonthView = A.Component.create({
 				var hourMinutesFormatter = instance.get('hourMinutesFormatter');
 
 				for (i = 1; i < headerElementsCount; i++) {
-					var timesheetDayNode = timesheetDayRow[String(i)];
+					var timesheetDayNode = timesheetDayRow[String(i)],
+						columnDataNode = A.Node.create(TPL_TIMESHEET_VIEW_COLUMN_DATA),
+						startDate = timesheetDay.get('startDate');
+
+					timesheetDayNode.set('data-startTime', (DateMath.toMidnight(DateMath.clone(startDate))).getTime());
 
 					if (i == 1) {
-						timesheetDayNode.append(rowDateFormatter.call(instance, timesheetDay.get('startDate')));
+						columnDataNode.append(rowDateFormatter.call(instance, startDate));
 					}
 					else if (i == 2) {
-						timesheetDayNode.append(rowDateFormatter.call(instance, timesheetDay.get('endDate')));
+						columnDataNode.append(rowDateFormatter.call(instance, timesheetDay.get('endDate')));
 					}
 					else if (i == 3) {
-						timesheetDayNode.append(String(timesheetDay.get('lunchTime') / 60000).concat(' min'));
+						columnDataNode.append(String(timesheetDay.get('lunchTime') / 60000).concat(' min'));
 					}
 					else if (i == 4) {
-						timesheetDayNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateAllTime(timesheetDay))));
+						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateAllTime(timesheetDay))));
 					}
 					else if (i == 5) {
-						timesheetDayNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateWorkTime(timesheetDay))));
+						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateWorkTime(timesheetDay))));
 					}
 					else if (i == 6) {
-						timesheetDayNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateOverTime(timesheetDay))));
+						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateOverTime(timesheetDay))));
 					}
 
-					timesheetDayNode.addClass(CSS_TVT_TABLE_DATA_COLUMN);
+					timesheetDayNode.append(columnDataNode);
 				}
 			}
 		},
@@ -1547,6 +1562,56 @@ var TimesheetMonthView = A.Component.create({
 
 A.TimesheetMonthView = TimesheetMonthView;
 
+var TimesheetDayRecorder = A.Component.create({
+	NAME: 'timesheet-day-recorder',
+
+	ATTRS: {
+		bodyTemplate: {
+			value: TPL_BODY_CONTENT
+		},
+
+		popover: {
+			setter: '_setPopover',
+			validator: isObject,
+			value: {}
+		},
+		
+		event: {}
+	},
+
+	EXTENDS: A.TimesheetDay,
+
+	prototype: {
+		initializer: function() {
+			instance.popover = new A.Popover(instance.get('popover'));
+		},
+
+		_setPopover: function(val) {
+			var instance = this;
+
+			return A.merge({
+				align: {
+					points: [A.WidgetPositionAlign.BC, A.WidgetPositionAlign.TC]
+				},
+				bodyContent: TPL_BODY_CONTENT,
+				constrain: true,
+				headerContent: TPL_HEADER_CONTENT,
+				preventOverlap: true,
+				position: 'top',
+				toolbars: {
+					footer: instance._getFooterToolbar()
+				},
+				visible: false,
+				zIndex: 500
+			},
+			val
+			);
+		}
+	}
+});
+
+A.TimesheetDayRecorder = TimesheetDayRecorder;
+
 }, '0.0.1', {
-	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "model", "model-list", "widget-stdmod"], "skinnable": true
+	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "aui-popover", "model", "model-list", "widget-stdmod"], "skinnable": true
 });
