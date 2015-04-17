@@ -1191,16 +1191,30 @@ var TimesheetMonthView = A.Component.create({
 		},
 
 		hourMinutesFormatter: {
-			value: function(date) {
+			value: function(time) {
 				var instance = this;
 				var timesheet = instance.get(TIMESHEET);
 
-				return A.DataType.Date.format(
-					date, {
-						format: '%Ih:%Mm',
-						locale: timesheet.get(LOCALE)
+				var hours = time / (60 * 60 * 1000);
+				var minutes = Math.abs((time % (60 * 60 * 1000)) / (60 * 1000));
+
+				if (hours < 10) {
+					if (hours < 0) {
+						hours = '-0' + Math.floor(Math.abs(hours));
 					}
-				);
+					else {
+						hours = '0' + Math.floor(hours);
+					}
+				}
+				else {
+					hours = Math.floor(hours);
+				}
+
+				if (minutes < 10) {
+					minutes = '0' + minutes;
+				}
+
+				return hours + ':' + minutes;
 			},
 			validator: isString
 		},
@@ -1252,7 +1266,6 @@ var TimesheetMonthView = A.Component.create({
 	EXTENDS: A.TimesheetView,
 
 	prototype: {
-		timesheetDayDateStack: null,
 		timesheetDayRowStack: null,
 		rowDataTableStack: null,
 
@@ -1262,9 +1275,9 @@ var TimesheetMonthView = A.Component.create({
 		initializer: function() {
 			var instance = this;
 
-			instance.timesheetDayDateStack = {};
 			instance.timesheetDayRowStack = {};
 			instance.rowDataTableStack = {};
+			instance.timesheetDayRowStacks = {};
 
 			instance[COLUMN_HEADER_NODE] = instance.get(COLUMN_HEADER_NODE);
 			instance[HEADER_TABLE_NODE] = instance.get(HEADER_TABLE_NODE);
@@ -1281,6 +1294,10 @@ var TimesheetMonthView = A.Component.create({
 			var instance = this;
 
 			instance[COLUMN_HEADER_NODE].appendTo(instance[COLUMN_ELEMENT_HEADER]);
+		},
+
+		bindUI: function() {
+			var instance = this;
 		},
 
 		// This is not necesseraly
@@ -1301,31 +1318,10 @@ var TimesheetMonthView = A.Component.create({
 			instance.loopDates(rowStartDate, rowEndDate, function(celDate, index) {
 				var timesheetDay = timesheetDaysAsObject[rowStartDate.getDate()];
 
-				//instance._syncTimesheetDayNodeUI(timesheetDay, timesheetDayColNode, celDate);
-
 				rowRenderedColumns++;
 			});
 
 			return rowNode;
-		},
-
-		/**
-		* TimesheetMonthView
-		*/
-		buildTimesheetDay: function(timesheetDay) {
-			var instance = this,
-				cacheKey = String(timesheetDay.get('startTime')),
-				rowDataTableNode = instance.rowDataTableStack[cacheKey];
-
-			if (!rowDataTableNode) {
-				rowDataTableNode = A.Node.create(TPL_TVT_TABLE_DATA);
-
-				var tableBody = rowDataTableNode.one(TBODY);
-
-				instance.rowDataTableStack[cacheKey] = rowDataTableNode;
-			}
-
-			return rowDataTableNode;
 		},
 
 		/**
@@ -1427,12 +1423,15 @@ var TimesheetMonthView = A.Component.create({
 
 				instance._buildTimesheetDay(timesheetDay, index);
 
-				rowNode.delegate('click', function(event) {
-					var columnNode = event.currentTarget,
-						node = A.Node.create(TPL_TIMESHEET_VIEW_COLUMN_DATA_EDITOR);
+				rowNode.delegate(
+					'mousedown', 
+					A.bind(instance._onMouseDownGrid, instance),
+					'.timesheet-day-content');
 
-					
-				}, _DOT + CSS_TVT_COLGRID);
+				rowNode.delegate(
+					'mouseup', 
+					A.bind(instance._onMouseUpGrid, instance),
+					'.timesheet-day-content');
 			});
 		},
 
@@ -1457,9 +1456,9 @@ var TimesheetMonthView = A.Component.create({
 		syncGridUI: function() {
 			var instance = this,
 				intervalStartDate = instance._findCurrentIntervalStart(),
-				startDateRef = DateMath.safeClearTime(intervalStartDate),
-				rowStartDate = DateMath.safeClearTime(DateMath.findMonthStart(startDateRef)),
-				rowEndDate = DateMath.safeClearTime(DateMath.findMonthEnd(startDateRef)),
+				startDateRef = DateMath.toMidnight(intervalStartDate),
+				rowStartDate = DateMath.toMidnight(DateMath.findMonthStart(startDateRef)),
+				rowEndDate = DateMath.toMidnight(DateMath.findMonthEnd(startDateRef)),
 				cacheKey = String(intervalStartDate.getTime()).concat(rowStartDate.getTime()).concat(rowEndDate.getTime()),
 				rowDataTableNode = instance.rowDataTableStack[cacheKey],
 				timesheet = instance.get(TIMESHEET);
@@ -1474,11 +1473,13 @@ var TimesheetMonthView = A.Component.create({
 				});
 
 				instance.rowDataTableStack[cacheKey] = instance[TABLE_ROWS];
+				instance.timesheetDayRowStacks[cacheKey] = A.clone(instance.timesheetDayRowStack);
 
 				timesheet.fire('viewTimesheetDays');
 			}
 			else {
 				instance[TABLE_ROWS] = rowDataTableNode;
+				instance.timesheetDayRowStack = instance.timesheetDayRowStacks[cacheKey];
 			}
 
 			instance[TABLE_ROW_CONTAINER].setHTML(instance[TABLE_ROWS]);
@@ -1506,41 +1507,11 @@ var TimesheetMonthView = A.Component.create({
 
 			if (timesheetDay) {
 				var headerElements = instance.get('headerElements'),
-					headerElementsCount = headerElements.length,
-					i, cacheKey = String(timesheetDay.get('startTime')),
-					timesheetDayRow = instance.timesheetDayRowStack[String(index)];
+					headerElementsCount = headerElements.length;
 
-				var rowDateFormatter = instance.get('rowDateFormatter');
-				var hourMinutesFormatter = instance.get('hourMinutesFormatter');
+				timesheetDay.set('rowIndex', index);
 
-				for (i = 1; i < headerElementsCount; i++) {
-					var timesheetDayNode = timesheetDayRow[String(i)],
-						columnDataNode = A.Node.create(TPL_TIMESHEET_VIEW_COLUMN_DATA),
-						startDate = timesheetDay.get('startDate');
-
-					timesheetDayNode.set('data-startTime', (DateMath.toMidnight(DateMath.clone(startDate))).getTime());
-
-					if (i == 1) {
-						columnDataNode.append(rowDateFormatter.call(instance, startDate));
-					}
-					else if (i == 2) {
-						columnDataNode.append(rowDateFormatter.call(instance, timesheetDay.get('endDate')));
-					}
-					else if (i == 3) {
-						columnDataNode.append(String(timesheetDay.get('lunchTime') / 60000).concat(' min'));
-					}
-					else if (i == 4) {
-						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateAllTime(timesheetDay))));
-					}
-					else if (i == 5) {
-						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateWorkTime(timesheetDay))));
-					}
-					else if (i == 6) {
-						columnDataNode.append(hourMinutesFormatter.call(instance, new Date(timesheet.calculateOverTime(timesheetDay))));
-					}
-
-					timesheetDayNode.append(columnDataNode);
-				}
+				instance._syncTimesheetDayNodeUI(timesheetDay, headerElementsCount);
 			}
 		},
 
@@ -1584,7 +1555,9 @@ var TimesheetMonthView = A.Component.create({
 
 			var formatter = instance.get(HEADER_DATE_FORMATTER);
 
-			instance.timesheetDayRowStack[String(index)] = {};
+			if (!instance.timesheetDayRowStack[String(index)]) {
+				instance.timesheetDayRowStack[String(index)] = {};
+			}
 
 			for (i = 0; i < headerElementsCount; i++) {
 				var columnNode = A.Node.create(TPL_TVT_GRID_COLUMN);
@@ -1593,8 +1566,24 @@ var TimesheetMonthView = A.Component.create({
 
 				if (i === 0) {
 					columnNode.addClass(CSS_TVT_COLGRID_FIRST);
-
 					columnNode.append(formatter.call(instance, celDate));
+				}
+				else if (i === 1) {
+					columnNode.addClass('timesheet-day-content');
+					columnNode.setData(FIELD_NAME, START_TIME);
+				}
+				else if (i === 2) {
+					columnNode.addClass('timesheet-day-content');
+					columnNode.setData(FIELD_NAME, END_TIME);
+				}
+				else if (i === 3) {
+					columnNode.addClass('timesheet-day-content');
+					columnNode.setData(FIELD_NAME, LUNCH_TIME);
+				}
+
+				if (i === 1 || i === 2 || i === 3) {
+					columnNode.setData('date', celDate);
+					columnNode.setData('rowIndex', index);
 				}
 
 				if (DateMath.isToday(celDate)) {
@@ -1611,24 +1600,104 @@ var TimesheetMonthView = A.Component.create({
 			return tableGridNode;
 		},
 
+		_onMouseDownGrid: function(event) {
+			var instance = this;
+			var timesheet = instance.get(TIMESHEET);
+			var recorder = timesheet.get(DAY_RECORDER);
+			var currentTarget = event.currentTarget;
+
+			if (recorder && !timesheet.get('disabled') && currentTarget.test('.timesheet-day-content')) {
+
+	           	instance._recording = true;
+			}
+		},
+
+		_onMouseUpGrid: function(event) {
+		   	var instance = this,
+				timesheet = instance.get(TIMESHEET),
+				recorder = timesheet.get(DAY_RECORDER),
+				currentTarget = event.currentTarget;
+
+		    if (recorder && instance._recording && !timesheet.get('disabled')) {
+		    	var selectedNode = recorder.get('selectedNode');
+
+		        recorder.hidePopover();
+
+		        if (selectedNode) {
+		        	selectedNode.removeClass('timesheet-selected-content');
+		        }
+
+		        var timesheetDay = currentTarget.getData(TIMESHEET_DAY);
+
+	           	recorder.set('selectedColumnName', currentTarget.getData(FIELD_NAME));
+
+	           	if (timesheetDay) {
+	           		recorder.set(TIMESHEET_DAY, timesheetDay);
+	           	}
+	           	else {
+
+	           	}
+
+	           	currentTarget.addClass('timesheet-selected-content');
+
+		        recorder.showPopover(currentTarget);
+		        recorder.set('selectedNode', currentTarget);
+
+		        instance._recording = false;
+		    }
+		},
+
 		/**
 		* TimesheetMonthView
 		*/
-		_syncTimesheetDayNodeUI: function(timesheetDay, container, celDate) {
+		_syncTimesheetDayNodeUI: function(timesheetDay, headerElementsCount) {
 			var instance = this;
-			var timesheet = instance.get(TIMESHEET);
 
-			if (timesheetDay) {
-				var timesheetDayNodeList = timesheetDay.get(NODE);
-				var startDate = timesheetDay.get(START_DATE);
+			var timesheet = instance.get(TIMESHEET),
+				rowDateFormatter = instance.get('rowDateFormatter'),
+				i,
+				hourMinutesFormatter = instance.get('hourMinutesFormatter'),
+				rowIndex = timesheetDay.get('rowIndex'),
+				timesheetDayRow = instance.timesheetDayRowStack[String(rowIndex)];
 
-				var intervalStartDate = DateMath.toMidnight(instance._findCurrentIntervalStart());
-			 
-				var timesheetDayNode = timesheetDayNodeList.item();
+			for (i = 1; i < headerElementsCount; i++) {
+				var timesheetDayNode = timesheetDayRow[String(i)],
+					columnDataNode = A.Node.create(TPL_TIMESHEET_VIEW_COLUMN_DATA);
 
-				timesheetDayNode.appendTo(container);
+				timesheetDayNode.setData(TIMESHEET_DAY, timesheetDay);
 
-				timesheetDay.syncUI();
+				if ((i == 1) && timesheetDay.get(START_DATE)) {
+					columnDataNode.html(rowDateFormatter.call(instance, timesheetDay.get(START_DATE)));
+				}
+				else if ((i == 2) && timesheetDay.get(END_DATE)) {
+					columnDataNode.html(rowDateFormatter.call(instance, timesheetDay.get(END_DATE)));
+				}
+				else if ((i == 3) && timesheetDay.get(LUNCH_TIME)) {
+					columnDataNode.html(String(timesheetDay.get(LUNCH_TIME) / 60000).concat(' min'));
+				}
+				else if (i == 4) {
+					var allTime = timesheet.calculateAllTime(timesheetDay);
+
+					if (allTime) {
+						columnDataNode.html(hourMinutesFormatter.call(instance, allTime));
+					}
+				}
+				else if (i == 5) {
+					var workTime = timesheet.calculateWorkTime(timesheetDay);
+
+					if (workTime) {
+						columnDataNode.html(hourMinutesFormatter.call(instance, workTime));
+					}
+				}
+				else if (i == 6) {
+					var overTime = timesheet.calculateOverTime(timesheetDay);
+
+					if (overTime) {
+						columnDataNode.html(hourMinutesFormatter.call(instance, overTime));
+					}
+				}
+
+				timesheetDayNode.setHTML(columnDataNode);
 			}
 		},
 
