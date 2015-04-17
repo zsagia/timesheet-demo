@@ -49,8 +49,14 @@
     box-shadow: none;
     text-shadow: none;
 }
+
+.timesheet-selected-content {
+    background: #000;
+    opacity: .04;
+}
+
 /* timesheet-base-view */
- .timesheet-view {
+.timesheet-view {
     border: 1px solid #ddd;
 }
 .timesheet-view-scrollable {
@@ -92,7 +98,7 @@
     height: 25px;
 }
 /* timesheet-base-event */
- .timesheet-event-hidden {
+.timesheet-event-hidden {
     display: none;
 }
 .timesheet-event-content {
@@ -154,6 +160,9 @@
     -moz-border-radius: 3px;
     -webkit-border-radius: 3px;
     border-radius: 3px;
+}
+.timepicker-popover {
+    z-index: 1000 !important;
 }
 .timesheet-view-table-hidden {
     display: none;
