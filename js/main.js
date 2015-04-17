@@ -461,6 +461,10 @@ var TimesheetBase =  A.Component.create({
 			validator: isDate
 		},
 
+		dayRecorder: {
+			setter: '_setDayRecorder'
+		},
+
 		firstDayOfWeek: {
 			value: 0,
 			validator: isNumber
@@ -525,6 +529,10 @@ var TimesheetBase =  A.Component.create({
 					this._processTemplate(TPL_TIMESHEET_TODAY)
 				);
 			}
+		},
+
+		userId: {
+			value: 0
 		},
 
 		viewsNode: {
@@ -648,6 +656,21 @@ var TimesheetBase =  A.Component.create({
 			}
 		},
 
+		syncTimesheetDayUI: function(timesheetDay) {
+			var instance = this;
+
+			var activeview =  instance.get(ACTIVE_VIEW);;
+
+			if (activeview) {
+				if (timesheetDay) {
+					var headerElements = activeview.get('headerElements'),
+						headerElementsCount = headerElements.length;
+
+					activeview._syncTimesheetDayNodeUI(timesheetDay, headerElementsCount);
+				}
+			}
+		},
+
 		/**
 		* TimesheetBase
 		*/
@@ -697,7 +720,7 @@ var TimesheetBase =  A.Component.create({
 
 				instance.renderView(activeView);
 
-				var eventRecorder = instance.get(EVENT_RECORDER);
+				var eventRecorder = instance.get(DAY_RECORDER);
 
 				if (eventRecorder) {
 					eventRecorder.hidePopover();
@@ -746,15 +769,32 @@ var TimesheetBase =  A.Component.create({
 				view.set(
 					TRIGGER_NODE,
 					A.Node.create(
-							Lang.sub(TPL_TIMESHEET_VIEW, {
-									 name: name,
-									 label: (instance.getString(name) || name)
-							})
+						Lang.sub(TPL_TIMESHEET_VIEW, {
+							name: name,
+							label: (instance.getString(name) || name)
+						})
 					)
 				);
 			}
 
 			return view.get(TRIGGER_NODE);
+		},
+
+		/**
+		* TimesheetBase
+		*/
+		_setDayRecorder: function(val) {
+			var instance = this;
+
+			if (val) {
+				val.setAttrs({
+					timesheet: instance
+				}, {
+					silent: true
+				});
+
+				val.addTarget(instance);
+			}
 		},
 
 		/**
