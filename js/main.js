@@ -975,9 +975,9 @@ var TimesheetView = A.Component.create({
 	ATTRS: {
 		bodyContent: {
 				value: _EMPTY_STR
-		 },
+		},
 
-		 height: {
+		height: {
 				value: 1000
 		},
 
