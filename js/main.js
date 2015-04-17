@@ -1018,6 +1018,10 @@ var TimesheetView = A.Component.create({
 			lazyAdd: false,
 			setter: '_setTimesheet'
 		},
+
+		userId: {
+			value: 0
+		}
 	},
 
 	AUGMENTS: [A.WidgetStdMod],
