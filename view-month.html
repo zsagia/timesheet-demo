@@ -93,6 +93,7 @@
 			        new Y.Timesheet({
 			            boundingBox: '#timesheet',
 			            dataObject: dataObject,
+			            dayRecorder: new Y.TimesheetDayRecorder(),
 			            items: dataObject.data.items,
 			            firstDayOfWeek: 1,
 			            locale: "hu",
