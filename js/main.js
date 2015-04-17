@@ -1566,8 +1566,28 @@ var TimesheetDayRecorder = A.Component.create({
 	NAME: 'timesheet-day-recorder',
 
 	ATTRS: {
+		selectedColumnName: {
+			validator: isString,
+			value: ''
+		},
+
+		selectedNode: {
+
+		},
+
 		bodyTemplate: {
-			value: TPL_BODY_CONTENT
+			value: TPL_RECORDER_BODY_CONTENT
+		},
+
+		dateFormat: {
+			validator: isString,
+			value: '%a, %B %d'
+		},
+
+		timesheetDay: {},
+
+		headerTemplate: {
+			value: TPL_RECORDER_HEADER_CONTENT
 		},
 
 		popover: {
@@ -1575,16 +1595,306 @@ var TimesheetDayRecorder = A.Component.create({
 			validator: isObject,
 			value: {}
 		},
-		
-		event: {}
+
+		strings: {
+			value: {},
+			setter: function(val) {
+				return A.merge({
+					cancel: 'Cancel',
+					description: 'Description',
+					edit: 'Edit',
+					endTime: 'End Time',
+					lunchTime: 'Lunch Time',
+					save: 'Save',
+					startTime: 'Start Time'
+					},
+					val || {}
+				);
+			},
+			validator: isObject
+		}
 	},
 
 	EXTENDS: A.TimesheetDay,
 
 	prototype: {
 		initializer: function() {
+			var instance = this;
+
+			instance.publish('cancel', {
+                defaultFn: instance._defCancelEventFn
+            });
+
+            instance.publish('edit', {
+                defaultFn: instance._defEditEventFn
+            });
+
+            instance.publish('save', {
+                defaultFn: instance._defSaveEventFn
+            });
+
 			instance.popover = new A.Popover(instance.get('popover'));
+			instance.popover.after('visibleChange', A.bind(instance._afterPopoverVisibleChange, instance));
 		},
+
+		getContentNode: function() {
+            var instance = this;
+            var popoverBB = instance.popover.get('boundingBox');
+
+            return popoverBB.one('.' + CSS_TIMESHEET_DAY_RECORDER_CONTENT);
+        },
+
+		getTemplateData: function(fieldName) {
+            var instance = this,
+                strings = instance.get('strings'),
+                timesheetDay = instance.get(TIMESHEET_DAY) || instance,
+                content = timesheetDay.get('content'),
+                endDate = timesheetDay.get('endDate'),
+                endTime = '',
+                startDate = timesheetDay.get('startDate')
+                startTime = '';
+
+            if (isUndefined(content)) {
+                content = '';
+            }
+
+            if (!isUndefined(endDate)) {
+                endTime = endDate.getTime();
+            }
+
+            if (!isUndefined(startDate)) {
+               startTime = startDate.getTime();
+            }
+
+            return {
+                content: content,
+                date: new Date(),
+                endDate: endDate,
+                fieldName: strings[fieldName],
+                startDate: startDate
+            };
+        },
+
+        getUpdatedTimesheetDay: function(optAttrMap) {
+            var instance = this;
+
+            var timesheetDay = instance.get(TIMESHEET_DAY),
+                formValues = instance.serializeForm(),
+                timeValues = formValues.content.split(':'),
+                selectedNode = instance.get('selectedNode'),
+                fieldName = selectedNode.getData(FIELD_NAME),
+                currentDate = selectedNode.getData('date'),
+                rowIndex = selectedNode.getData('rowIndex'),
+                workDate;
+
+            if (!timesheetDay) {
+                timesheetDay = instance.clone();
+
+                timesheetDay.set('timesheet', instance.get(TIMESHEET), {
+	                silent: true
+	            });
+            }
+
+            timesheetDay.set('rowIndex', rowIndex);
+
+            workDate = DateMath.add(currentDate, DateMath.HOUR, timeValues[0]);
+            workDate = DateMath.add(workDate, DateMath.MINUTES, timeValues[1]);
+
+            if (fieldName === START_TIME) {
+            	timesheetDay.set(START_DATE, workDate);
+            }
+            else if (fieldName === END_TIME) {
+            	timesheetDay.set(END_DATE, workDate);
+            }
+            else if (fieldName === LUNCH_TIME) {
+            	timesheetDay.set(LUNCH_TIME, workDate.getTime() - currentDate.getTime());
+            }
+
+            return timesheetDay;
+        },
+
+		hidePopover: function() {
+            var instance = this;
+
+            instance.popover.hide();
+        },
+
+        populateForm: function() {
+            var instance = this,
+                bodyTemplate = instance.get('bodyTemplate'),
+                headerTemplate = instance.get('headerTemplate'),
+                templateData = instance.getTemplateData(instance.get('selectedColumnName'));
+
+            instance.popover.setStdModContent('body', A.Lang.sub(bodyTemplate, templateData));
+            instance.popover.setStdModContent('header', A.Lang.sub(headerTemplate, templateData));
+
+            if (!instance.timepicker) {
+            	instance.timepicker = new A.TimePicker({
+	            mask: '%H:%M',
+	            trigger: '#timesheedDayContent',
+	            on: {
+	                selectionChange: function(event) {
+	                    
+	                }
+	            }
+	        });
+            }
+
+            instance.popover.addToolbar(instance._getFooterToolbar(), 'footer');
+        },
+
+        serializeForm: function() {
+            var instance = this;
+
+            return A.QueryString.parse(_serialize(instance.formNode.getDOM()));
+        },
+
+        showPopover: function(node) {
+            var instance = this,
+                timesheetDay = instance.get(TIMESHEET_DAY);
+
+            if (!instance.popover.get('rendered')) {
+                instance._renderPopover();
+            }
+
+            var align = instance.popover.get('align');
+            instance.popover.set('align', {
+            	node: node,
+                points: align.points
+            });
+
+            instance.popover.show();
+        },
+
+        _afterPopoverVisibleChange: function(event) {
+            var instance = this;
+
+            var	popover = instance.popover,
+				boundingBox = popover.get('boundingBox');
+
+			boundingBox.addClass('timesheet-popover');
+
+            if (event.newVal) {
+                instance.populateForm();
+
+                if (!instance.get('event')) {
+                    var contentNode = instance.getContentNode();
+
+                    if (contentNode) {
+                        setTimeout(function() {
+                            contentNode.selectText();
+                        }, 0);
+                    }
+                }
+            }
+            else {
+                instance.set(TIMESHEET_DAY, null, {
+                    silent: true
+                });
+            }
+        },
+
+        _defCancelEventFn: function() {
+            var instance = this;
+
+            var selectedNode = instance.get('selectedNode');
+
+            instance.hidePopover();
+
+            if (selectedNode) {
+		        selectedNode.removeClass('timesheet-selected-content');
+
+		        instance.set('selectedNode', null);
+		    } 
+        },
+
+        _defEditEventFn: function(event) {
+            var instance = this;
+
+            var timesheet = instance.get(TIMESHEET);
+
+            timesheet.syncTimesheetDayUI(event.timesheetDay);
+
+            instance._defCancelEventFn();
+        },
+
+        _defSaveEventFn: function(event) {
+            var instance = this;
+
+            var timesheet = instance.get(TIMESHEET);
+
+            timesheet.addTimesheetDays(event.timesheetDay);
+
+            timesheet.syncTimesheetDayUI(event.timesheetDay);
+
+            instance._defCancelEventFn();
+        },
+
+		_getFooterToolbar: function() {
+			var instance = this;
+
+			var	timesheetDay = instance.get(TIMESHEET_DAY),
+				strings = instance.get('strings'),
+				children = [
+					{
+						label: strings.save,
+						on: {
+							click: A.bind(instance._handleSaveEvent, instance)
+						}
+					},
+					{
+						label: strings.cancel,
+						on: {
+							click: A.bind(instance._handleCancelEvent, instance)
+						}
+					}
+				];
+
+			return [children];
+		},
+
+		_handleCancelEvent: function(event) {
+            var instance = this;
+
+            instance.fire('cancel');
+
+            if (event.domEvent) {
+                event.domEvent.preventDefault();
+            }
+
+            event.preventDefault();
+        },
+
+		_handleSaveEvent: function(event) {
+            var instance = this,
+                eventName = instance.get(TIMESHEET_DAY) ? 'edit' : 'save',
+                selectedNode = instance.get('selectedNode');
+
+            instance.fire(eventName, {
+                timesheetDay: instance.getUpdatedTimesheetDay(),
+                currentDate: selectedNode.getData('date')
+            });
+           
+            if (event.domEvent) {
+                event.domEvent.preventDefault();
+            }
+
+            event.preventDefault();
+        },
+
+		_renderPopover: function() {
+            var instance = this,
+                timesheet = instance.get(TIMESHEET),
+                timesheetBB = timesheet.get('boundingBox');
+
+            instance.popover.render(timesheetBB);
+
+            instance.formNode = A.Node.create(TPL_FORM);
+
+           	//instance.formNode.on('submit', A.bind(instance._onSubmitForm, instance));
+            //instance.popover.get('boundingBox').addClass(CSS_TIMESHEET_DAY);
+            instance.popover.get('contentBox').wrap(instance.formNode);
+        },
 
 		_setPopover: function(val) {
 			var instance = this;
@@ -1593,9 +1903,9 @@ var TimesheetDayRecorder = A.Component.create({
 				align: {
 					points: [A.WidgetPositionAlign.BC, A.WidgetPositionAlign.TC]
 				},
-				bodyContent: TPL_BODY_CONTENT,
+				bodyContent: TPL_RECORDER_BODY_CONTENT,
 				constrain: true,
-				headerContent: TPL_HEADER_CONTENT,
+				headerContent: TPL_RECORDER_HEADER_CONTENT,
 				preventOverlap: true,
 				position: 'top',
 				toolbars: {
@@ -1613,5 +1923,5 @@ var TimesheetDayRecorder = A.Component.create({
 A.TimesheetDayRecorder = TimesheetDayRecorder;
 
 }, '0.0.1', {
-	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "aui-popover", "model", "model-list", "widget-stdmod"], "skinnable": true
+	"requires": ["aui-button", "aui-datatype", "aui-component", "aui-node-base", "aui-popover", "aui-timepicker", "aui-timepicker-native", "io-form", "model", "model-list", "querystring-parse", "widget-stdmod"], "skinnable": true
 });
