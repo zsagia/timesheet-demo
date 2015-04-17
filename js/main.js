@@ -362,13 +362,30 @@ A.mix(TimesheetDaySupport.prototype, {
 	calculateOverTime: function(timesheetDay) {
 		var instance = this;
 
-		return instance.calculateWorkTime(timesheetDay) - instance.get(BASE_WORK_TIME);
+		var workTime = instance.calculateWorkTime(timesheetDay),
+			baseWorkTime = instance.get(BASE_WORK_TIME),
+			overTime = '';
+
+		if (isNumber(workTime) && isNumber(baseWorkTime)) {
+			overTime = workTime - baseWorkTime;
+		}
+
+		return overTime;
 	},
 
 	calculateWorkTime: function(timesheetDay) {
 		var instance = this;
 
-		return timesheetDay.get('endTime') - timesheetDay.get('startTime') - timesheetDay.get('lunchTime');
+		var endTime = timesheetDay.get(END_DATE),
+			lunchTime = timesheetDay.get(LUNCH_TIME),
+			startTime = timesheetDay.get(START_DATE),
+			workTime = '';
+
+		if (endTime && startTime && lunchTime) {
+			workTime = endTime.getTime() - startTime.getTime() - lunchTime;
+		}
+
+		return workTime
 	},
 
 	getTimesheetDays: function(filterFn, skipSort) {
