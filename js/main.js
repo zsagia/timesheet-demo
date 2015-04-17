@@ -235,6 +235,10 @@ var TimesheetDay = A.Component.create({
 			validator: isNumber
 		},
 
+		rowIndex: {
+
+		},
+
 		startDate: {
 			validator: isDate
 		},
@@ -252,7 +256,51 @@ var TimesheetDay = A.Component.create({
 		}
 	},
 
-	EXTENDS: A.Model
+	EXTENDS: A.Model,
+
+	prototype: {
+		clone: function() {
+	        var instance = this,
+	            cloned = null,
+	            timesheet = instance.get(TIMESHEET);
+
+	        if (timesheet) {
+	            cloned = new timesheet.dayModel();
+	            cloned.copyPropagateAttrValues(instance, null, {
+	                silent: true
+	            });
+	        }
+
+	        return cloned;
+	    },
+
+	    copyDates: function(timesheetDay, options) {
+	        var instance = this;
+
+	        instance.setAttrs({
+	            endDate: DateMath.clone(timesheetDay.get('endDate')),
+	            startDate: DateMath.clone(timesheetDay.get('startDate'))
+	        },
+	        options);
+	    },
+
+	    copyPropagateAttrValues: function(timesheetDay, dontCopyMap, options) {
+	        var instance = this,
+	            attrMap = {};
+
+	        A.Array.each(instance.constructor.PROPAGATE_ATTRS, function(attrName) {
+	            if (!((dontCopyMap || {}).hasOwnProperty(attrName))) {
+	                var value = timesheetDay.get(attrName);
+
+	                if (!isObject(value)) {
+	                    attrMap[attrName] = value;
+	                }
+	            }
+	        });
+
+	        instance.setAttrs(attrMap, options);
+	    }
+	}
 });
 
 A.TimesheetDay = TimesheetDay;
@@ -300,7 +348,15 @@ A.mix(TimesheetDaySupport.prototype, {
 	calculateAllTime: function(timesheetDay) {
 		var instance = this;
 
-		return timesheetDay.get('endTime') - timesheetDay.get('startTime');
+		var endTime = timesheetDay.get(END_DATE),
+			startTime = timesheetDay.get(START_DATE),
+			allTime = '';
+
+		if (endTime && startTime) {
+			allTime = endTime.getTime() - startTime.getTime();
+		}
+
+		return allTime;
 	},
 
 	calculateOverTime: function(timesheetDay) {
